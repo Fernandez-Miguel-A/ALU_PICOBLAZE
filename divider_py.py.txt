@@ -1,0 +1,92 @@
+#MAIN:
+N = 17
+div = 3
+
+def divider(N, div):
+    r, coci = 0,0
+    for i in range(15, -1, -1):
+        #print("i: %i"%(i))
+        r = (r<<1) | ((N>>15)&0x0001)
+        N <<= 1
+        coci <<= 1
+        if r >= div:
+            r -= div
+            coci |= 1
+    return r, coci
+
+
+
+print("N: %i, div: %i,    r: %i, coci: %i"%(N, div, *divider(N, div)))
+print(N//div)
+
+
+
+print("\n\n")
+print("\ndivider2()\n")
+
+
+
+
+def divider2(N, div):
+    r, coci = 0,0
+    for i in range(15, -1, -1):
+
+        print("\n i: %i, bits: %i, bool: %i, and: %i" % (i, 2**i, N & (2**i), N and (2**i) ))
+        #print("bit1: %i, bit0: %i" % (N & 0x1, N & 0x10) )
+        print("N & (2**15) : %i, %i" %( N & (2**15), bool(N & (2**15)) ))
+        #print("bit1_b: %i, bit0_b: %i" % (bool(N & 0x1), bool(N & 0x10)) )
+
+        r = (r<<1) | bool(N & (2**15))
+        N <<= 1
+        coci <<= 1
+        if r >= div:
+            r -= div
+            coci |= 1
+    return r, coci
+
+
+
+N = 17
+div = 3
+
+
+print("N: %i, div: %i,    r: %i, coci: %i"%(N, div, *divider2(N, div)))
+print(N//div)
+
+
+
+
+
+print("\n\n")
+print("\ndivider3()\n")
+
+
+
+
+def divider3(N, div):
+    r, coci = 0,0
+    for i in range(15, -1, -1):
+        r = (r<<1) | bool(N & 0x8000)
+        N <<= 1
+        coci <<= 1
+        if r >= div:
+            r -= div
+            coci |= 1
+    print(hex(coci), hex(r))
+    return coci, r
+
+
+
+N = 17
+div = 3
+
+
+print("N: %i, div: %i,    r: %i, coci: %i"%(N, div, *divider3(N, div)))
+print(N//div)
+
+
+
+
+
+sentencias store, fetch para salvaguardar los registros!
+
