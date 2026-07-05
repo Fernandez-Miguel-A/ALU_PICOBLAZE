@@ -1,0 +1,73 @@
+; Divide Routine (16-bit / 16-bit = 16-bit result, remainder)
+; ==================================================
+; Shift and subtract algorithm
+;
+dividend        EQU      s0 ; preserved
+dividend_16b    EQU      s8
+divisor         EQU      s1 ; preserved
+divisor_16b     EQU      s9
+quotient        EQU      s2 ; preserved ; $7b
+quotient_16b    EQU      sA             ; $00
+remainder       EQU      s3 ; modified ; $73
+remainder_16b   EQU      sB   		   ; $01
+bit_mask        EQU      s4 ;
+bit_mask2       EQU      sC ; used to test bits in dividend,
+                        ; one-hot encoded, modified
+;
+div    EQU     $0b    ;;0x0001
+div_16b EQU    $02    ;;0x0100
+;
+N      EQU     $bc   ;;0x0002          ;0x0001
+N_16b  EQU     $fc  ;;0x3100          ;0xCE00
+
+;n - div*coci == rest
+;$fcbc - $020b*$007b == $0173
+
+
+MAIN:
+div_16by16:
+LOAD     dividend, N            ;; s0
+LOAD     dividend_16b, N_16b    ;; s8
+
+LOAD    divisor, div            ;; s1
+LOAD    divisor_16b, div_16b    ;; s9
+
+;
+LOAD remainder, 00        ; clear remainder
+LOAD remainder_16b, 00
+LOAD bit_mask, $00       ; start with most-significant bit (msb)
+LOAD bit_mask2, $80
+div_loop:
+    TEST bit_mask2, $ff
+    JUMP Z, masc_LSB
+
+    TEST dividend_16b, bit_mask2 ;; s8, mask = sC
+    JUMP NZ, corrimiento
+masc_LSB:
+    TEST dividend, bit_mask  ;; s0, mask = s4; test bit, set CARRY if bit is '1'
+
+corrimiento:
+    SLA remainder           ;; s3 ; shift CARRY into lsb of remainder
+    SLA remainder_16b       ;; sB
+    SL0 quotient            ;; s2 ; shift quotient left (multiply by 2)
+    SLA quotient_16b        ;; sA
+    ;
+    COMP remainder_16b, divisor_16b ; is remainder_16b > divisor_16b?
+    JUMP C, no_sub                  ; if divisor is greater, continue to next bit
+    COMP remainder, divisor         ; is remainder > divisor?
+    JUMP C, no_sub                  ; if divisor is greater, continue to next bit
+    SUB remainder, divisor          ; if remainder > divisor, then subtract
+    SUBC remainder_16b, divisor_16b
+    ADD quotient, 01                ; add one to quotient
+    ADDC quotient_16b, 0
+no_sub:
+    SR0 bit_mask2            ;; sC ; shift to examine next bit position
+    JUMP NZ, end_loop
+    SRA bit_mask             ;; s4
+    JUMP NZ, div_loop        ; if bit_mask=0, then all bits examined
+    
+    JUMP MAIN
+
+end_loop:
+    SRA bit_mask             ;; s4
+    JUMP div_loop
