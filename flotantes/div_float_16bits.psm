@@ -1,0 +1,167 @@
+; ============================================================
+; División en punto flotante 16 bits para PicoBlaze
+; IEEE 754 Half-Precision: 1 signo + 5 exp + 10 mantisa
+; ============================================================
+; Registros de entrada:
+;   s0:s1 = Dividendo (16 bits float16)
+;   s2:s3 = Divisor   (16 bits float16)
+;   s0/s2 = byte alto (signo + exp[4:1])
+;   s1/s3 = byte bajo (exp[0] + mantisa[9:0] — parcial)
+; Registros de salida:
+;   s8:s9 = Resultado (16 bits float16)
+; Registros temporales: s4–sF
+; ============================================================
+
+float16_div:
+    ; --- PASO 1: Extraer signo ---
+    LOAD  s4, s0              ; copia byte alto dividendo
+    AND   s4, 80              ; aislar bit de signo
+    LOAD  s5, s2              ; copia byte alto divisor
+    AND   s5, 80              ; aislar bit de signo
+    XOR   s4, s5              ; s4 = signo resultado (bit 7)
+    LOAD  sF, s4              ; guardar signo resultado en sF
+
+    ; --- PASO 2: Extraer exponente del dividendo ---
+    LOAD  s4, s0
+    AND   s4, 7C              ; máscara 0111_1100 para exp[4:1]
+    SR0   s4                  ; desplazar 2 posiciones derecha
+    SR0   s4
+    LOAD  s5, s1
+    AND   s5, 80              ; bit exp[0] está en bit 7 de s1  
+    SR0   s5
+    SR0   s5
+    SR0   s5
+    SR0   s5
+    SR0   s5
+    SR0   s5
+    SR0   s5                  ; ahora exp[0] en bit 0
+    OR    s4, s5              ; s4 = exponente dividendo (5 bits)
+    LOAD  sA, s4              ; sA = exp_A
+
+    ; --- PASO 3: Extraer exponente del divisor ---
+    LOAD  s4, s2
+    AND   s4, 7C
+    SR0   s4
+    SR0   s4
+    LOAD  s5, s3
+    AND   s5, 80
+    SR0   s5
+    SR0   s5
+    SR0   s5
+    SR0   s5
+    SR0   s5
+    SR0   s5
+    SR0   s5
+    OR    s4, s5              ; s4 = exponente divisor (5 bits)
+    LOAD  sB, s4              ; sB = exp_B
+
+    ; --- PASO 4: Calcular exponente resultado ---
+    ; E_res = E_A - E_B + 15 (sesgo)
+    LOAD  s4, sA
+    SUB   s4, sB
+    ADD   s4, 0F              ; sumar sesgo 15
+    LOAD  sC, s4              ; sC = exponente resultado
+
+    ; --- PASO 5: Extraer mantisa dividendo (con bit implícito) ---
+    ; mantisa = 10 bits en s1[6:0] y parte baja
+    LOAD  s4, s1
+    AND   s4, 03              ; bits altos mantisa (bits 9-8)
+    LOAD  s5, s0              ; PicoBlaze: 8 bits por registro
+    ; Aquí se reconstruye 1.mantisa (11 bits) en s6:s7
+    ; Bit implícito = 1 si exp != 0
+    LOAD  s6, 04              ; bit implícito en posición 10
+    OR    s6, s4              ; s6 = parte alta mantisa dividendo
+    LOAD  s7, s1              ; s7 = parte baja mantisa dividendo
+
+    ; --- PASO 6: Extraer mantisa divisor (con bit implícito) ---
+    LOAD  s4, s3
+    AND   s4, 03
+    LOAD  s8, 04
+    OR    s8, s4              ; s8 = parte alta mantisa divisor
+    LOAD  s9, s3              ; s9 = parte baja mantisa divisor
+
+    ; --- PASO 7: División por restauración (11 iteraciones) ---
+    ; Residuo en s6:s7, divisor en s8:s9
+    ; Cociente se acumula en sD:sE
+    LOAD  sD, 00              ; cociente alto = 0
+    LOAD  sE, 00              ; cociente bajo = 0
+    LOAD  s4, 0B              ; contador = 11 iteraciones
+
+div_loop:
+    ; Desplazar residuo a la izquierda 1 bit
+    SL0   s7                  ; shift bajo
+    SLA   s6                  ; shift alto con carry
+
+    ; Intentar restar divisor
+    LOAD  s4, s7
+    SUB   s4, s9              ; resta parte baja
+    LOAD  s5, s6
+    SUBC  s5, s8              ; resta parte alta con borrow
+
+    ; Si resultado >= 0 (carry = 1): aceptar
+    JUMP  NC, div_restore
+
+    ; Aceptar sustracción
+    LOAD  s7, s4              ; actualizar residuo
+    LOAD  s6, s5
+    ; Poner bit 1 en cociente
+    SL1   sE                  ; shift cociente bajo, insertar 1
+    SLA   sD                  ; shift cociente alto
+    JUMP  div_next
+
+div_restore:
+    ; No restar (restaurar) — poner bit 0
+    SL0   sE                  ; shift cociente bajo, insertar 0
+    SLA   sD
+
+div_next:
+    LOAD  s4, s4              ; (placeholder: decrementar contador)
+    SUB   s4, 01
+    JUMP  NZ, div_loop
+
+    ; --- PASO 8: Normalizar ---
+    ; Verificar si bit 10 del cociente está activo
+    TEST  sD, 04              ; bit 10 (en byte alto)
+    JUMP  NZ, normalized
+
+    ; Desplazar cociente izquierda, decrementar exponente
+normalize_loop:
+    SL0   sE
+    SLA   sD
+    SUB   sC, 01              ; decrementar exponente
+    TEST  sD, 04
+    JUMP  Z, normalize_loop
+
+normalized:
+    ; --- PASO 9: Ensamblar resultado en s8:s9 ---
+    ; s8 = signo(1) | exp(5) | mantisa_alta(2)
+    ; s9 = mantisa_baja(8)
+    LOAD  s8, sF              ; signo en bit 7
+    LOAD  s4, sC              ; exponente
+    SL0   s4                  ; posicionar exponente
+    SL0   s4
+    AND   s4, 7C              ; máscara exp bits
+    OR    s8, s4              ; combinar signo + exp alto
+    LOAD  s4, sC
+    AND   s4, 01              ; bit bajo del exponente
+    SL0   s4
+    SL0   s4
+    SL0   s4
+    SL0   s4
+    SL0   s4
+    SL0   s4
+    SL0   s4                  ; mover a bit 7
+    LOAD  s9, sE              ; mantisa baja
+    AND   s9, 7F              ; 7 bits bajos
+    OR    s9, s4              ; combinar exp[0] + mantisa
+    LOAD  s4, sD
+    AND   s4, 03              ; bits altos mantisa
+    OR    s8, s4              ; añadir a byte alto
+
+    RETURN
+
+; ============================================================
+; Ejemplo: 6.5 / 1.5
+; Dividendo = 0x4680
+; Divisor   = 0x3E00
+; ============================================================
