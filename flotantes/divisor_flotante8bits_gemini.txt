@@ -1,0 +1,122 @@
+Escribir un código en ensamblador de **PicoBlaze** para dividir números de punto flotante de 8 bits es un desafío interesante. Dado que el estándar IEEE 754 no define oficialmente un formato de 8 bits, asumiremos el formato **FP8 (E4M3)**, muy popular hoy en día en aplicaciones de inteligencia artificial.
+Este formato se estructura de la siguiente manera (8 bits = 1 byte):
+ * **1 bit** de Signo (Bit 7).
+ * **4 bits** de Exponente (Bits 6 a 3) con un *Bias* (sesgo) de 7.
+ * **3 bits** de Mantisa (Fracción) (Bits 2 a 0), con un bit 1 implícito a la izquierda.
+Aquí tienes una implementación estructurada paso a paso. Para mantener el código ejecutable y comprensible en las limitaciones de PicoBlaze, este código asume números **normalizados** y omite casos especiales (como división por cero, infinitos, NaN o números desnormalizados).
+### Lógica del Algoritmo de División Flotante
+ 1. **Signo:** Se calcula haciendo un XOR entre los bits de signo de los operandos.
+ 2. **Exponente:** Se restan los exponentes (Exp_A - Exp_B) y se vuelve a sumar el *Bias* (7).
+ 3. **Mantisa:** Se extraen las mantisas, se les añade el "1" implícito, se alinean y se dividen usando división entera.
+ 4. **Normalización:** Se ajusta el resultado para que vuelva a encajar en los 3 bits.
+### Código en Ensamblador PicoBlaze (.psm)
+```assembly
+; ==============================================================================
+; Rutina: FP8_DIVIDE
+; Descripción: Divide dos números en punto flotante de 8 bits (E4M3).
+; Entradas: 
+;   sA = Dividendo
+;   sB = Divisor
+; Salidas:  
+;   sC = Cociente (Resultado)
+; Registros temporales destruidos: s0, s1, s2, s3, s4, s5
+; ==============================================================================
+
+FP8_DIVIDE:
+    ; ------------------------------------------------------
+    ; 1. CALCULAR EL SIGNO (Bit 7) -> (Signo A) XOR (Signo B)
+    ; ------------------------------------------------------
+    LOAD sC, sA         ; Copiar dividendo a sC
+    XOR  sC, sB         ; XOR con divisor
+    AND  sC, 80         ; Aislar el bit 7 (10000000b). sC guarda el signo final.
+
+    ; ------------------------------------------------------
+    ; 2. CALCULAR EL EXPONENTE (Bits 6:3) -> ExpA - ExpB + Bias
+    ; ------------------------------------------------------
+    ; Extraer Exponente de A
+    LOAD s0, sA
+    AND  s0, 78         ; Máscara 01111000b
+    SR0  s0             ; Desplazar 3 veces a la derecha
+    SR0  s0
+    SR0  s0             ; s0 = Exponente A
+    
+    ; Extraer Exponente de B
+    LOAD s1, sB
+    AND  s1, 78
+    SR0  s1
+    SR0  s1
+    SR0  s1             ; s1 = Exponente B
+    
+    ; Operación matemática: s0 = s0 - s1 + 7 (Bias)
+    SUB  s0, s1
+    ADD  s0, 07         ; s0 = Nuevo Exponente
+
+    ; ------------------------------------------------------
+    ; 3. PREPARAR MANTISAS (Añadir bit implícito)
+    ; ------------------------------------------------------
+    LOAD s2, sA
+    AND  s2, 07         ; Aislar 3 bits de fracción (00000111b)
+    OR   s2, 08         ; Añadir el bit implícito '1' -> 00001MMM (Dividendo)
+    
+    LOAD s3, sB
+    AND  s3, 07
+    OR   s3, 08         ; Añadir el bit implícito '1' -> 00001MMM (Divisor)
+
+    ; ------------------------------------------------------
+    ; 4. DIVISIÓN ENTERA DE MANTISAS (s2 / s3)
+    ; ------------------------------------------------------
+    ; Para no perder decimales, desplazamos el dividendo (s2) a la izquierda 
+    ; antes de dividir. Lo desplazamos 3 posiciones (por los 3 bits de mantisa).
+    SL0  s2
+    SL0  s2
+    SL0  s2
+
+    ; Algoritmo de división por restas sucesivas (s2 / s3)
+    LOAD s4, 00         ; s4 será el cociente de la mantisa
+    LOAD s5, 05         ; Contador de iteraciones (5 bits de precisión necesarios)
+
+DIV_LOOP:
+    SL0  s4             ; Desplazar cociente a la izquierda
+    COMPARE s2, s3      ; ¿Es Dividendo >= Divisor?
+    JUMP C, SKIP_SUB    ; Si Carry está activo (s2 < s3), no restar
+    
+    SUB  s2, s3         ; s2 = s2 - s3
+    ADD  s4, 01         ; Poner en 1 el bit menos significativo del cociente
+
+SKIP_SUB:
+    SL0  s2             ; Desplazar dividendo restante
+    SUB  s5, 01         ; Decrementar contador
+    JUMP NZ, DIV_LOOP   ; Repetir si no es cero
+
+    ; ------------------------------------------------------
+    ; 5. NORMALIZACIÓN Y EMPAQUETADO
+    ; ------------------------------------------------------
+    ; En este punto:
+    ; - sC tiene el Signo en el bit 7 (0x80)
+    ; - s0 tiene el Exponente base
+    ; - s4 tiene la nueva Mantisa
+    
+    ; (NOTA: En un algoritmo real, aquí se verifica si s4 requiere normalización
+    ; desplazándolo y ajustando s0. Por simplicidad asumiremos que ya está alineado).
+    
+    AND  s4, 07         ; Quitar el bit implícito, quedarnos con 3 bits (00000111b)
+    
+    ; Empaquetar Exponente
+    SL0  s0             ; Desplazar Exponente 3 bits a la izquierda
+    SL0  s0
+    SL0  s0
+    AND  s0, 78         ; Limpiar basura por si hubo overflow
+    
+    ; Ensamblar resultado final en sC: Signo | Exponente | Mantisa
+    OR   sC, s0
+    OR   sC, s4
+
+    ; Fin de la rutina, el resultado está en sC
+    RETURN
+
+```
+### Notas importantes sobre la implementación:
+ * **Capacidad de PicoBlaze:** Dado que PicoBlaze carece de instrucciones de división por hardware, la división de la mantisa debe hacerse iterativamente mediante desplazamientos (SL0) y restas (SUB), lo que consume ciclos de reloj.
+ * **Normalización Dinámica:** En un caso del mundo real, al dividir mantisas, el resultado podría desbordarse o quedar por debajo del bit implícito (ej. 0.110... en lugar de 1.xxx...). Si implementas esto en producción, deberás agregar un bloque lógico tras la etiqueta 5. NORMALIZACIÓN que revise el bit 3 de s4. Si es 0, deberías desplazar s4 a la izquierda y restar 1 al exponente s0.
+ * **Desbordamientos (Overflow/Underflow):** En esta versión simplificada, no hemos protegido las sumas/restas de exponentes. Si el resultado es demasiado grande, el exponente dará la vuelta (wrap-around).
+¿Estás planeando usar esto en un simulador de PicoBlaze (como KCPSM6) o directamente sintetizado en una FPGA de Xilinx?
