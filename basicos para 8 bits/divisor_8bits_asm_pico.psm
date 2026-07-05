@@ -1,0 +1,34 @@
+; Divide Routine (8-bit / 8-bit = 8-bit result, remainder)
+; ==================================================
+; Shift and subtract algorithm
+;
+div_8by8:
+dividend    EQU      s0 ; preserved
+divisor     EQU      s1 ; preserved
+quotient    EQU      s2 ; preserved
+remainder   EQU      s3 ; modified
+bit_mask    EQU      s4 ; used to test bits in dividend,
+                        ; one-hot encoded, modified
+
+;
+MAIN:
+ LOAD dividend, 17
+ LOAD divisor,  3
+ 
+ 
+LOAD remainder, 00      ; clear remainder
+LOAD bit_mask, $80       ; start with most-significant bit (msb)
+div_loop:
+    TEST dividend, bit_mask ; test bit, set CARRY if bit is '1'
+    SLA remainder           ; shift CARRY into lsb of remainder
+    SL0 quotient            ; shift quotient left (multiply by 2)
+    ;
+    COMP remainder, divisor      ; is remainder > divisor?
+    JUMP C, no_sub                  ; if divisor is greater, continue to next bit
+    SUB remainder, divisor          ; if remainder > divisor, then subtract
+    ADD quotient, 01                ; add one to quotient
+no_sub:
+    SR0 bit_mask            ; shift to examine next bit position
+    JUMP NZ, div_loop       ; if bit_mask=0, then all bits examined
+    
+JUMP MAIN
