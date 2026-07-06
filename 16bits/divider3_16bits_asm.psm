@@ -74,16 +74,16 @@ div_loop:
     SLA quotient_16b        ;; sA
 	;;;
 	
-    LOAD temp_low, remainder
-    LOAD temp_high, remainder_16b
+;;;;    LOAD temp_low, remainder
+;;;;    LOAD temp_high, remainder_16b
 
-    SUB temp_low, divisor
-    SUBC temp_high, divisor_16b  ; Si hay Carry aquí, significa que Residuo < Divisor
+    SUB remainder, divisor
+    SUBC remainder_16b, divisor_16b  ; Si hay Carry aquí, significa que Residuo < Divisor
 
-    JUMP C, no_sub               ; Si Residuo < Divisor, no podemos restar.
+    JUMP C, restore_rema               ; Si Residuo < Divisor, no podemos restar.
 
-    LOAD remainder, temp_low
-    LOAD remainder_16b, temp_high
+;;;;    LOAD remainder, temp_low
+;;;;    LOAD remainder_16b, temp_high
 	;;;
 ;;;    COMP remainder_16b, divisor_16b ; is remainder_16b > divisor_16b?
 ;;;    JUMP C, no_sub                  ; if divisor is greater, continue to next bit
@@ -94,12 +94,19 @@ div_loop:
 ;;;    SUBC remainder_16b, divisor_16b
     ADD quotient, 01                ; add one to quotient
     ADDC quotient_16b, 0
-no_sub:
+    
+    JUMP next_bit
+
+restore_rema:
+    ADD remainder, divisor
+    ADDC remainder_16b, divisor_16b
+    
+
+next_bit:
     SUB i, 01             ;; s4
     JUMP NZ, div_loop        ; if bit_mask=0, then all bits examined
     
     JUMP MAIN
-    
     
     
 ;falla para N: $32bc, div: $0110
