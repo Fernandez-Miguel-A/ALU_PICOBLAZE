@@ -64,12 +64,12 @@ LOAD remainder_16b, 00
 
 LOAD i, 16
 div_loop:
-    TEST dividend_16b, $80
-
-    SLA remainder           ;; s3 ; shift CARRY into lsb of remainder
-    SLA remainder_16b       ;; sB
     SL0 dividend
     SLA dividend_16b
+    
+    SLA remainder           ;; s3 ; shift CARRY into lsb of remainder
+    SLA remainder_16b       ;; sB
+    
     SL0 quotient            ;; s2 ; shift quotient left (multiply by 2)
     SLA quotient_16b        ;; sA
 	;;;
