@@ -1,0 +1,108 @@
+;
+; FALLABA por algo, correguido!!
+;
+
+; Divide Routine (16-bit / 16-bit = 16-bit result, remainder)
+; ==================================================
+; Shift and subtract algorithm
+;
+
+
+
+
+
+dividend        EQU      s0 ; preserved
+dividend_16b    EQU      s8
+divisor         EQU      s1 ; preserved
+divisor_16b     EQU      s9
+quotient        EQU      s2 ; preserved ; $7b
+quotient_16b    EQU      sA             ; $00
+remainder       EQU      s3 ; modified ; $73
+remainder_16b   EQU      sB   		   ; $01
+i               EQU      s4 ;
+temp_low        EQU      s5;<.......................
+temp_high       EQU      sD;<.......................
+;
+div    EQU     $10 ;$0b    ;;0x0001
+div_16b EQU    $01 ;$02    ;;0x0100
+;
+N      EQU     $bc ;$bc   ;;0x0002          ;0x0001
+N_16b  EQU     $32 ;$fc  ;;0x3100          ;0xCE00
+
+;n - div*coci == rest
+;$fcbc - $020b*$007b == $0173
+
+
+
+;def divider3(N, div):
+;    r, coci = 0,0
+;    for i in range(15, -1, -1):
+;        r = (r<<1) | bool(N & 0x8000)
+;        N <<= 1
+;        coci <<= 1
+;        if r >= div:
+;            r -= div
+;            coci |= 1
+;    print(hex(coci), hex(r))
+
+
+
+MAIN:
+div_16by16:
+LOAD     dividend, N            ;; s0
+LOAD     dividend_16b, N_16b    ;; s8
+
+LOAD    divisor, div            ;; s1
+LOAD    divisor_16b, div_16b    ;; s9
+
+;
+LOAD quotient, 00        ; clear remainder
+LOAD quotient_16b, 00
+
+LOAD remainder, 00        ; clear remainder
+LOAD remainder_16b, 00
+
+LOAD i, 16
+div_loop:
+    TEST dividend_16b, $80
+
+    SLA remainder           ;; s3 ; shift CARRY into lsb of remainder
+    SLA remainder_16b       ;; sB
+    SL0 dividend
+    SLA dividend_16b
+    SL0 quotient            ;; s2 ; shift quotient left (multiply by 2)
+    SLA quotient_16b        ;; sA
+	;;;
+	
+    LOAD temp_low, remainder
+    LOAD temp_high, remainder_16b
+
+    SUB temp_low, divisor
+    SUBC temp_high, divisor_16b  ; Si hay Carry aquí, significa que Residuo < Divisor
+
+    JUMP C, no_sub               ; Si Residuo < Divisor, no podemos restar.
+
+    LOAD remainder, temp_low
+    LOAD remainder_16b, temp_high
+	;;;
+;;;    COMP remainder_16b, divisor_16b ; is remainder_16b > divisor_16b?
+;;;    JUMP C, no_sub                  ; if divisor is greater, continue to next bit
+;;;    COMP remainder, divisor         ; is remainder > divisor?
+;;;    JUMP C, no_sub                  ; if divisor is greater, continue to next bit
+    
+;;;    SUB remainder, divisor          ; if remainder > divisor, then subtract
+;;;    SUBC remainder_16b, divisor_16b
+    ADD quotient, 01                ; add one to quotient
+    ADDC quotient_16b, 0
+no_sub:
+    SUB i, 01             ;; s4
+    JUMP NZ, div_loop        ; if bit_mask=0, then all bits examined
+    
+    JUMP MAIN
+    
+    
+    
+;falla para N: $32bc, div: $0110
+; deberia coci: $2f, resto: $CC
+; retorna coci: $2b, resto: $050C
+;
