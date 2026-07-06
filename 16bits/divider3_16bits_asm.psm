@@ -70,8 +70,8 @@ div_loop:
     SLA remainder           ;; s3 ; shift CARRY into lsb of remainder
     SLA remainder_16b       ;; sB
     
-    SL0 quotient            ;; s2 ; shift quotient left (multiply by 2)
-    SLA quotient_16b        ;; sA
+ ;;   SL0 quotient            ;; s2 ; shift quotient left (multiply by 2)
+ ;;   SLA quotient_16b        ;; sA
 	;;;
 	
 ;;;;    LOAD temp_low, remainder
@@ -92,8 +92,10 @@ div_loop:
     
 ;;;    SUB remainder, divisor          ; if remainder > divisor, then subtract
 ;;;    SUBC remainder_16b, divisor_16b
-    ADD quotient, 01                ; add one to quotient
-    ADDC quotient_16b, 0
+  ;;  ADD quotient, 01                ; add one to quotient
+  ;;  ADDC quotient_16b, 0
+  
+	OR dividend, 01
     
     JUMP next_bit
 
