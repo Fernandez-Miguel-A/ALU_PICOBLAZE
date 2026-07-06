@@ -1,5 +1,5 @@
 ;
-; FALLABA por algo, correguido!!
+; FALLABA algo relacionado a lineas COMP, correguido!!
 ;
 
 ; Divide Routine (16-bit / 16-bit = 16-bit result, remainder)
