@@ -14,11 +14,11 @@ bit_mask        EQU      s4 ;
 bit_mask2       EQU      sC ; used to test bits in dividend,
                         ; one-hot encoded, modified
 ;
-div    EQU     $0b    ;;0x0001
-div_16b EQU    $02    ;;0x0100
+div    EQU     $10    ;;0x0001
+div_16b EQU    $01    ;;0x0100
 ;
 N      EQU     $bc   ;;0x0002          ;0x0001
-N_16b  EQU     $fc  ;;0x3100          ;0xCE00
+N_16b  EQU     $32  ;;0x3100          ;0xCE00
 
 ;n - div*coci == rest
 ;$fcbc - $020b*$007b == $0173
