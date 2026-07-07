@@ -69,33 +69,13 @@ div_loop:
     
     SLA remainder           ;; s3 ; shift CARRY into lsb of remainder
     SLA remainder_16b       ;; sB
-    
- ;;   SL0 quotient            ;; s2 ; shift quotient left (multiply by 2)
- ;;   SLA quotient_16b        ;; sA
-	;;;
-	
-;;;;    LOAD temp_low, remainder
-;;;;    LOAD temp_high, remainder_16b
 
     SUB remainder, divisor
     SUBC remainder_16b, divisor_16b  ; Si hay Carry aquí, significa que Residuo < Divisor
 
     JUMP C, restore_rema               ; Si Residuo < Divisor, no podemos restar.
 
-;;;;    LOAD remainder, temp_low
-;;;;    LOAD remainder_16b, temp_high
-	;;;
-;;;    COMP remainder_16b, divisor_16b ; is remainder_16b > divisor_16b?
-;;;    JUMP C, no_sub                  ; if divisor is greater, continue to next bit
-;;;    COMP remainder, divisor         ; is remainder > divisor?
-;;;    JUMP C, no_sub                  ; if divisor is greater, continue to next bit
-    
-;;;    SUB remainder, divisor          ; if remainder > divisor, then subtract
-;;;    SUBC remainder_16b, divisor_16b
-  ;;  ADD quotient, 01                ; add one to quotient
-  ;;  ADDC quotient_16b, 0
-  
-	OR dividend, 01
+    OR dividend, 01
     
     JUMP next_bit
 
@@ -111,7 +91,7 @@ next_bit:
     JUMP MAIN
     
     
-;falla para N: $32bc, div: $0110
+;fallaba para N: $32bc, div: $0110
 ; deberia coci: $2f, resto: $CC
 ; retorna coci: $2b, resto: $050C
 ;
