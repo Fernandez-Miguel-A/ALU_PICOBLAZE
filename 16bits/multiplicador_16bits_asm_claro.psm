@@ -1,0 +1,126 @@
+
+i      EQU     s0
+bit_mask  EQU  s1
+bit_mask2 EQU  s2
+R_n    EQU     s3
+R_n_16b EQU    s4
+D_n    EQU     s5
+D_n_01 EQU     s6
+D_n_16b EQU     sE
+
+C_n    EQU     s8
+C_n_01 EQU     s9
+
+
+N      EQU     $04   ;;0x0002          ;0x0001
+N_16b  EQU     $01  ;;0x3100          ;0xCE00
+;                   ;;0x3102 == 12546 ;0xCE01 == -12799
+
+;-12799//3 == -0x10AA === 0xEF56
+
+div    EQU     $11    ;;0x0001
+div_16b EQU    $00    ;;0x0100
+;                   ;; 0x101 == 257
+
+;D . R 
+
+;Supongamos que quiero multiplicar A x 19, haría:
+
+;A . 19 =  A . (16 + 2 + 1)
+; " " " = (A . 16) + (A . 2) + (A . 1)
+; " " " = (A <<4) + ( A <<1) +  A
+
+
+
+
+LOAD    D_n, div          ;; div
+LOAD    D_n_01, div_16b   ;; div_16b
+LOAD    R_n, N            ;; s3
+LOAD    R_n_16b, N_16b    ;; s4
+
+STORE   D_n, 02           ;;; s5,  div
+STORE   D_n_01, 03        ;;; s6,  div_16b
+
+STORE   R_n, 04           ;; N_16b ;; s3
+STORE   R_n_16b, 05       ;; N_16b ;; s4
+
+
+MULTI:
+    FETCH    R_n, 04        ;; Agregado
+    FETCH    R_n_16b, 05    ;; Agregado
+    CALL Multi_n
+JUMP MULTI
+
+
+
+;D . R_n = .. = D . N
+
+;D . 11 = (D.1)_3 + 0 + (D.1)_1 + (D.1)_0
+;D . 11 = D.8 + 0 + D.2 + D.1
+
+
+Principal_mul:
+xor i, i          	  	 ;s0
+LOAD bit_mask, $01 	  	 ;s1
+LOAD bit_mask2, $00  	 ;s2
+LOAD C_n, 0    	  	   	 ;s8
+LOAD C_n_01, 0 	  	   	 ;s9
+next_bit:
+    TEST R_n_16b, bit_mask2   ; s4
+    JUMP NC, no_incre_16b     ; (R_n_16b and 1<<j) == TRUE
+    ADD C_n, D_n              ; X << j
+    ADDC C_n_01, D_n_01       ; X << j
+    no_incre_16b:
+
+    TEST R_n, bit_mask   ; R_n == s3;   D_n == s5
+    JUMP NC, no_incre    ; (R_n and 1<<j) == TRUE
+add_C_n:
+    ADD C_n, D_n         ; X << j
+    ADDC C_n_01, D_n_01  ; X << j
+    no_incre:
+
+    SL0 bit_mask        ; s1
+    SLA bit_mask2       ; s2
+    SL0 D_n             ; s5
+    SLA D_n_01          ; s6
+    SLA D_n_16b         ; sE
+
+    
+    ADD i, 1             ; s0
+    COMP i, $10
+    JUMP C, next_bit
+salir:
+RETI ENABLE
+
+
+;---------------------------------------------------
+;           MULT  16 bits signado
+Multi_n:
+    FETCH R_n_16b, 05    ;   N
+    FETCH R_n, 04        ;   N_16b
+    TEST R_n_16b, $80
+    JUMP NC, positivo
+    LOAD s7, $01
+
+    XOR R_n, $FF; complemento 2
+    XOR R_n_16b, $FF; complemento 2
+    ADD R_n, $01
+    ADDC R_n_16b, 0
+positivo:
+
+    CALL     Principal_mul
+
+    COMP s7, 1
+    JUMP NZ, positivo_2
+
+    XOR C_n, $FF    ; s9 ; complemento 2
+    XOR C_n_01, $FF ; sA ; complemento 2
+    ADD C_n, $01
+    ADDC C_n_01, 0
+
+positivo_2:
+
+final_multi:
+    RETI ENABLE
+    ;;C_n_01, C_n
+
