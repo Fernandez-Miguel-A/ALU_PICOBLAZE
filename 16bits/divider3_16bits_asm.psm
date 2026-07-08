@@ -43,7 +43,7 @@ N_16b  EQU     $32 ;$fc  ;;0x3100          ;0xCE00
 ;        if r >= div:
 ;            r -= div
 ;            coci |= 1
-;    print(hex(coci), hex(r))
+;    print("coci, r    ->", hex(coci), hex(r))
 
 
 
