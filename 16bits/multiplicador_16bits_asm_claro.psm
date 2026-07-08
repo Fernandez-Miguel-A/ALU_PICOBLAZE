@@ -10,12 +10,14 @@ M2_16b EQU     sE
 multi    EQU     s8
 multi_16b EQU     s9
 
-N      EQU     $bc   ;;0x0002          ;0x0001
-N_16b  EQU     $32  ;;0x3100          ;0xCE00
+N      EQU     $2b
+N_16b  EQU     $03
 ;
 N2     EQU     $2f
 N2_16b  EQU     $00
-                   ;;0x3102 == 12546 ;0xCE01 == -12799
+                   ;;0x032b == 811 ;0x002f == 47
+                   
+                   ;;N*N2 == 0x94e5 = 38117
 
 ;-12799//3 == -0x10AA === 0xEF56
 
