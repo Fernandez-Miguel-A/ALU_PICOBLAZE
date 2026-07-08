@@ -2,25 +2,22 @@
 i      EQU     s0
 bit_mask  EQU  s1
 bit_mask2 EQU  s2
-R_n    EQU     s3
-R_n_16b EQU    s4
-D_n    EQU     s5
-D_n_01 EQU     s6
-D_n_16b EQU     sE
+M1     EQU     s3
+M1_16b EQU    s4
+M2     EQU     s5
+M2_01  EQU     s6
+M2_16b EQU     sE
+multi    EQU     s8
+multi_16b EQU     s9
 
-C_n    EQU     s8
-C_n_01 EQU     s9
-
-
-N      EQU     $04   ;;0x0002          ;0x0001
-N_16b  EQU     $01  ;;0x3100          ;0xCE00
-;                   ;;0x3102 == 12546 ;0xCE01 == -12799
+N      EQU     $bc   ;;0x0002          ;0x0001
+N_16b  EQU     $32  ;;0x3100          ;0xCE00
+;
+N2     EQU     $2f
+N2_16b  EQU     $00
+                   ;;0x3102 == 12546 ;0xCE01 == -12799
 
 ;-12799//3 == -0x10AA === 0xEF56
-
-div    EQU     $11    ;;0x0001
-div_16b EQU    $00    ;;0x0100
-;                   ;; 0x101 == 257
 
 ;D . R 
 
@@ -33,57 +30,57 @@ div_16b EQU    $00    ;;0x0100
 
 
 
-LOAD    D_n, div          ;; div
-LOAD    D_n_01, div_16b   ;; div_16b
-LOAD    R_n, N            ;; s3
-LOAD    R_n_16b, N_16b    ;; s4
+LOAD    M1, N            ;; s3
+LOAD    M1_16b, N_16b    ;; s4
+LOAD    M2, N2          ;; div
+LOAD    M2_01, N2_16b   ;; div_16b
 
-STORE   D_n, 02           ;;; s5,  div
-STORE   D_n_01, 03        ;;; s6,  div_16b
+STORE   M2, 02           ;;; s5,  div
+STORE   M2_01, 03        ;;; s6,  div_16b
 
-STORE   R_n, 04           ;; N_16b ;; s3
-STORE   R_n_16b, 05       ;; N_16b ;; s4
+STORE   M1, 04           ;; N_16b ;; s3
+STORE   M1_16b, 05       ;; N_16b ;; s4
 
 
-MULTI:
-    FETCH    R_n, 04        ;; Agregado
-    FETCH    R_n_16b, 05    ;; Agregado
+MULTI_16:
+    FETCH    M1, 04        ;; Agregado
+    FETCH    M1_16b, 05    ;; Agregado
     CALL Multi_n
-JUMP MULTI
+JUMP MULTI_16
 
 
 
-;D . R_n = .. = D . N
+;M1 . M2 = .. = M1 . N
 
-;D . 11 = (D.1)_3 + 0 + (D.1)_1 + (D.1)_0
-;D . 11 = D.8 + 0 + D.2 + D.1
+;M1 . 11 = (M1.1)_3 + 0 + (M1.1)_1 + (M1.1)_0
+;M1 . 11 = M1.8 + 0 + M1.2 + M1.1
 
 
 Principal_mul:
 xor i, i          	  	 ;s0
 LOAD bit_mask, $01 	  	 ;s1
 LOAD bit_mask2, $00  	 ;s2
-LOAD C_n, 0    	  	   	 ;s8
-LOAD C_n_01, 0 	  	   	 ;s9
+LOAD multi, 0    	  	   	 ;s8
+LOAD multi_16b, 0 	  	   	 ;s9
 next_bit:
-    TEST R_n_16b, bit_mask2   ; s4
-    JUMP NC, no_incre_16b     ; (R_n_16b and 1<<j) == TRUE
-    ADD C_n, D_n              ; X << j
-    ADDC C_n_01, D_n_01       ; X << j
+    TEST M1_16b, bit_mask2   ; s4
+    JUMP NC, no_incre_16b     ; (M1_16b and 1<<j) == TRUE
+    ADD multi, M2              ; X << j
+    ADDC multi_16b, M2_01       ; X << j
     no_incre_16b:
 
-    TEST R_n, bit_mask   ; R_n == s3;   D_n == s5
-    JUMP NC, no_incre    ; (R_n and 1<<j) == TRUE
+    TEST M1, bit_mask   ; M1 == s3;   D_n == s5
+    JUMP NC, no_incre    ; (M1 and 1<<j) == TRUE
 add_C_n:
-    ADD C_n, D_n         ; X << j
-    ADDC C_n_01, D_n_01  ; X << j
+    ADD multi, M2         ; X << j
+    ADDC multi_16b, M2_01  ; X << j
     no_incre:
 
     SL0 bit_mask        ; s1
     SLA bit_mask2       ; s2
-    SL0 D_n             ; s5
-    SLA D_n_01          ; s6
-    SLA D_n_16b         ; sE
+    SL0 M2             ; s5
+    SLA M2_01          ; s6
+    SLA M2_16b         ; sE
 
     
     ADD i, 1             ; s0
@@ -96,16 +93,16 @@ RETI ENABLE
 ;---------------------------------------------------
 ;           MULT  16 bits signado
 Multi_n:
-    FETCH R_n_16b, 05    ;   N
-    FETCH R_n, 04        ;   N_16b
-    TEST R_n_16b, $80
+    FETCH M1_16b, 05    ;   N
+    FETCH M1, 04        ;   N_16b
+    TEST M1_16b, $80
     JUMP NC, positivo
     LOAD s7, $01
 
-    XOR R_n, $FF; complemento 2
-    XOR R_n_16b, $FF; complemento 2
-    ADD R_n, $01
-    ADDC R_n_16b, 0
+    XOR M1, $FF; complemento 2
+    XOR M1_16b, $FF; complemento 2
+    ADD M1, $01
+    ADDC M1_16b, 0
 positivo:
 
     CALL     Principal_mul
@@ -113,14 +110,14 @@ positivo:
     COMP s7, 1
     JUMP NZ, positivo_2
 
-    XOR C_n, $FF    ; s9 ; complemento 2
-    XOR C_n_01, $FF ; sA ; complemento 2
-    ADD C_n, $01
-    ADDC C_n_01, 0
+    XOR multi, $FF    ; s9 ; complemento 2
+    XOR multi_16b, $FF ; sA ; complemento 2
+    ADD multi, $01
+    ADDC multi_16b, 0
 
 positivo_2:
 
 final_multi:
     RETI ENABLE
-    ;;C_n_01, C_n
+    ;;mul_16b, mul
 
