@@ -8,10 +8,12 @@ M2     EQU     s5
 M2_01  EQU     s6
 M2_16b EQU     sE
 multi    EQU     s8
-multi_16b EQU     s9
+multi_16b EQU    s9
+multi_n01 EQU    sA
+multi_n02 EQU    sB
 
-N      EQU     $2b
-N_16b  EQU     $03
+N      EQU     $bc
+N_16b  EQU     $32
 ;
 N2     EQU     $2f
 N2_16b  EQU     $00
@@ -61,21 +63,27 @@ JUMP MULTI_16
 Principal_mul:
 xor i, i          	  	 ;s0
 LOAD bit_mask, $01 	  	 ;s1
-LOAD bit_mask2, $00  	 ;s2
-LOAD multi, 0    	  	   	 ;s8
-LOAD multi_16b, 0 	  	   	 ;s9
+LOAD bit_mask2, $00  	         ;s2
+LOAD multi, 0    	  	 ;s8
+LOAD multi_16b, 0 	  	 ;s9
+LOAD multi_n01, 0                ;sA
+LOAD multi_n02, 0                ;sB
 next_bit:
-    TEST M1_16b, bit_mask2   ; s4
-    JUMP NC, no_incre_16b     ; (M1_16b and 1<<j) == TRUE
-    ADD multi, M2              ; X << j
+    TEST M1_16b, bit_mask2      ; s4
+    JUMP NC, no_incre_16b       ; (M1_16b and 1<<j) == TRUE
+    ADD multi, M2               ; X << j
     ADDC multi_16b, M2_01       ; X << j
+    ADDC multi_n01, M2_16b          ;
+    ADDC multi_n02, 0           ;falta algo
     no_incre_16b:
 
     TEST M1, bit_mask   ; M1 == s3;   D_n == s5
     JUMP NC, no_incre    ; (M1 and 1<<j) == TRUE
 add_C_n:
-    ADD multi, M2         ; X << j
+    ADD multi, M2          ; X << j
     ADDC multi_16b, M2_01  ; X << j
+    ADDC multi_n01, M2_16b ; X << j
+    ADDC multi_n02, 0      ; falta algo
     no_incre:
 
     SL0 bit_mask        ; s1
@@ -112,10 +120,15 @@ positivo:
     COMP s7, 1
     JUMP NZ, positivo_2
 
-    XOR multi, $FF    ; s9 ; complemento 2
-    XOR multi_16b, $FF ; sA ; complemento 2
+    XOR multi, $FF     ; s8 ; 
+    XOR multi_16b, $FF ; s9 ; 
+    XOR multi_n01, $FF ; sA ; 
+    XOR multi_n02, $FF ; sB ; complemento 2
+
     ADD multi, $01
     ADDC multi_16b, 0
+    ADDC multi_n01, 0
+    ADDC multi_n02, 0
 
 positivo_2:
 
