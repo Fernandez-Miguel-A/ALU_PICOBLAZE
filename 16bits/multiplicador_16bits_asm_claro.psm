@@ -1,7 +1,7 @@
 
 i      EQU     s0
-bit_mask  EQU  s1
-bit_mask2 EQU  s2
+;bit_mask  EQU  s1
+;bit_mask2 EQU  s2
 M1     EQU     s3
 M1_16b EQU    s4
 M2     EQU     s5
@@ -32,6 +32,9 @@ N2_16b  EQU     $00
 ; " " " = (A <<4) + ( A <<1) +  A
 
 
+;; total de registros usados: 11.
+;; registros no utilizados s1, s2, sC, sD, sF.
+
 
 
 LOAD    M1, N            ;; s3
@@ -61,41 +64,45 @@ JUMP MULTI_16
 
 
 Principal_mul:
-xor i, i          	  	 ;s0
-LOAD bit_mask, $01 	  	 ;s1
-LOAD bit_mask2, $00  	         ;s2
+;xor i, i          	  	 ;s0
+;LOAD bit_mask, $01 	  	 ;s1
+;LOAD bit_mask2, $00  	         ;s2
 LOAD multi, 0    	  	 ;s8
 LOAD multi_16b, 0 	  	 ;s9
 LOAD multi_n01, 0                ;sA
 LOAD multi_n02, 0                ;sB
+LOAD i, $10
 next_bit:
-    TEST M1_16b, bit_mask2      ; s4
-    JUMP NC, no_incre_16b       ; (M1_16b and 1<<j) == TRUE
+    ;TEST M1_16b, bit_mask2      ; s4
+    SR0 M1_16b
+    SRA M1
+    JUMP NC, no_incre;_16b       ; (M1_16b and 1<<j) == TRUE
     ADD multi, M2               ; X << j
     ADDC multi_16b, M2_01       ; X << j
     ADDC multi_n01, M2_16b          ;
     ADDC multi_n02, 0           ;falta algo
-    no_incre_16b:
+    ;no_incre_16b:
 
-    TEST M1, bit_mask   ; M1 == s3;   D_n == s5
-    JUMP NC, no_incre    ; (M1 and 1<<j) == TRUE
+    ;TEST M1, bit_mask   ; M1 == s3;   D_n == s5
+    ;JUMP NC, no_incre    ; (M1 and 1<<j) == TRUE
 add_C_n:
-    ADD multi, M2          ; X << j
-    ADDC multi_16b, M2_01  ; X << j
-    ADDC multi_n01, M2_16b ; X << j
-    ADDC multi_n02, 0      ; falta algo
+    ;ADD multi, M2          ; X << j
+    ;ADDC multi_16b, M2_01  ; X << j
+    ;ADDC multi_n01, M2_16b ; X << j
+    ;ADDC multi_n02, 0      ; falta algo
     no_incre:
 
-    SL0 bit_mask        ; s1
-    SLA bit_mask2       ; s2
+    ;SL0 bit_mask        ; s1
+    ;SLA bit_mask2       ; s2
     SL0 M2             ; s5
     SLA M2_01          ; s6
     SLA M2_16b         ; sE
 
     
-    ADD i, 1             ; s0
-    COMP i, $10
-    JUMP C, next_bit
+    SUB i, 1             ; s0
+    ;COMP i, $10
+    ;JUMP C, next_bit
+    JUMP NZ, next_bit
 salir:
 RETI ENABLE
 
