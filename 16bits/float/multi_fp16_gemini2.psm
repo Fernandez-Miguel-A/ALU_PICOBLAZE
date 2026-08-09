@@ -1,0 +1,167 @@
+; ===================================================================
+; Subrutina: FMUL_16 (Multiplicación Float de 16 bits)
+; Entradas: s1:s0 = Operando A, s3:s2 = Operando B
+; Salidas:  s5:s4 = Resultado (A * B)
+; ===================================================================
+
+;; total de registros usados: 13.
+;; registros no utilizados sD, sE, sF.
+
+MAIN:
+LOAD s1, $62
+LOAD s0, $2c
+
+LOAD s3, $4a
+LOAD s2, $0d
+
+CALL FMUL_16
+
+STORE s5, $11
+STORE s4, $10
+JUMP MAIN
+
+FMUL_16:
+    ; ---------------------------------------------------------------
+    ; 1. CALCULAR SIGNO Y GUARDAR EN sB
+    ; ---------------------------------------------------------------
+    LOAD sB, s1
+    XOR sB, s3
+    AND sB, $80        ; sB ahora contiene el bit de signo final (0x80 o 0x00)
+
+    ; ---------------------------------------------------------------
+    ; 2. COMPROBAR SI ALGÚN OPERANDO ES CERO
+    ; ---------------------------------------------------------------
+    LOAD sC, s1
+    AND sC, $7F        ; Enmascarar el signo de A
+    OR sC, s0         ; Si sC es 0, el operando A era 0.0
+    JUMP Z, RET_ZERO
+
+    LOAD sC, s3
+    AND sC, $7F        ; Enmascarar el signo de B
+    OR sC, s2
+    JUMP Z, RET_ZERO
+
+    ; ---------------------------------------------------------------
+    ; 3. SUMAR EXPONENTES Y RESTAR EL SESGO (BIAS)
+    ; ---------------------------------------------------------------
+    LOAD s6, s1
+    SR0 s6
+    SR0 s6
+    AND s6, $1F        ; s6 = Exponente de A
+
+    LOAD sC, s3
+    SR0 sC
+    SR0 sC
+    AND sC, $1F        ; sC = Exponente de B
+
+    ADD s6, sC        ; Exp A + Exp B
+    SUB s6, $0F        ; Restar Bias (15 dec = 0F hex)
+    ; (Nota: Aquí se omite el chequeo de Overflow/Underflow por espacio)
+    JUMP C, RET_ZERO   ; Si hay Borrow (C=1), hubo UNDERFLOW -> Retornar 0.0
+
+    ; ---------------------------------------------------------------
+    ; 4. PREPARAR MANTISAS (Añadir el '1' implícito)
+    ; ---------------------------------------------------------------
+    AND s1, $03        ; Dejar solo los 2 bits bajos del alto de A
+    OR s1, $04         ; Añadir el '1' implícito (bit 2). Mantisa A es 11 bits.
+    
+    AND s3, $03        ; Dejar solo los 2 bits bajos del alto de B
+    OR s3, $04         ; Añadir el '1' implícito (bit 2). Mantisa B es 11 bits.
+
+    ; ---------------------------------------------------------------
+    ; 5. MULTIPLICAR MANTISAS (11-bit x 11-bit = 22-bit)
+    ; Multiplicador: s3:s2
+    ; Multiplicando: sC:s1:s0 (Aumentamos a 3 bytes para los desplazamientos)
+    ; Producto: s9:s8:s7
+    ; ---------------------------------------------------------------
+    LOAD sC, 00       ; Inicializar multiplicando alto
+    LOAD s9, 00       ; Inicializar producto alto
+    LOAD s8, 00       ; Inicializar producto medio
+    LOAD s7, 00       ; Inicializar producto bajo
+    LOAD sA, $0B       ; Contador del bucle = 11 (0B hex)
+
+MULT_LOOP:
+    SR0 s3            ; Desplazar multiplicador a la derecha
+    SRA s2            ; Carry entra en el byte bajo
+    JUMP NC, NO_ADD   ; Si no hay carry (bit era 0), no sumamos
+
+    ; Sumar multiplicando al producto
+    ADD s7, s0
+    ADDC s8, s1
+    ADDC s9, sC
+
+NO_ADD:
+    ; Desplazar multiplicando a la izquierda para la próxima iteración
+    SL0 s0
+    SLA s1
+    SLA sC
+    
+    SUB sA, 01        ; Decrementar contador
+    JUMP NZ, MULT_LOOP
+
+    ; ---------------------------------------------------------------
+    ; 6. NORMALIZAR
+    ; El bit MSB del producto 22 bits puede estar en bit 21 o bit 20.
+    ; (Bit 21 corresponde al bit 5 del registro s9).
+    ; ---------------------------------------------------------------
+    TEST s9, $20       ; Comprobar si el bit 5 de s9 es '1'
+    JUMP Z, NORM_DONE
+    
+    ; Si MSB == 1, desplazamos el producto a la derecha y sumamos 1 al exp
+    SR0 s9
+    SRA s8
+    SRA s7
+    ADD s6, 01        ; Incrementamos exponente
+NORM_DONE:
+
+    COMP s6, $1F
+    JUMP NC, RET_INF   ; Si Exp >= 31 -> Retornar Infinito
+    ; ---------------------------------------------------------------
+    ; 7. EMPAQUETAR EL RESULTADO FINAL
+    ; Mantisa final (10 bits) está en s9(3:0) y s8(7:2).
+    ; El bit implícito quedó en s9(4), lo ignoramos.
+    ; ---------------------------------------------------------------
+    
+    ; --- Construir Byte Bajo (s4) ---
+    LOAD s4, s9
+    SL0 s4
+    SL0 s4
+    SL0 s4
+    SL0 s4
+    SL0 s4
+    SL0 s4            ; Movemos los 2 bits altos de mantisa a s4(7:6)
+    
+    LOAD sC, s8
+    SR0 sC
+    SR0 sC            ; Movemos los 8 bits bajos a sC(5:0)
+    OR s4, sC         ; s4 está completo (Los 8 bits bajos de la mantisa)
+
+    ; --- Construir Byte Alto (s5) ---
+    LOAD s5, s9
+    SR0 s5
+    SR0 s5
+    AND s5, $03        ; Aislamos los 2 bits más significativos de la mantisa
+
+    LOAD sC, s6       ; Cargamos el exponente resultante
+    SL0 sC
+    SL0 sC            ; Lo desplazamos a la posición correcta (bits 6:2)
+    AND sC, $7C        ; Máscara de seguridad para el exponente
+    OR s5, sC         ; Ensamblamos el exponente
+    
+    OR s5, sB         ; Ensamblamos el bit de signo previamente guardado
+    RET
+
+    ; ---------------------------------------------------------------
+    ; RUTINA DE SALIDA POR CERO
+    ; ---------------------------------------------------------------
+RET_ZERO:
+    LOAD s5, sB       ; Mantiene el signo (-0.0 o +0.0)
+    LOAD s4, 00
+    RET
+
+
+RET_INF:
+    LOAD s5, $7C       ; Exponente max (0x1F) sin mantisa
+    OR s5, sB         ; Agregar signo
+    LOAD s4, $00
+    RET
