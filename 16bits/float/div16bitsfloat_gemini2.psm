@@ -1,0 +1,171 @@
+; =========================================================================
+; SUBRUTINA: DIVISOR DE PUNTO FLOTANTE DE 16 BITS (FP16)
+; PicoBlaze-3 (KCPSM3)
+; =========================================================================
+
+;; total de registros usados: 12.
+;; registros no utilizados s9, sA, sB, sC.
+
+
+PRINCIPAL:
+LOAD  s1, $78
+LOAD  s0, $46
+
+LOAD  s3, $34
+LOAD  s2, $e9
+
+;; COCI_high = s5
+;; COCI_low = s4
+
+CALL fp16_divide
+
+STORE s5, $15
+STORE s4, $14
+
+JUMP PRINCIPAL
+
+fp16_divide:
+    ; ---------------------------------------------------------------------
+    ; 1. Validar División por Cero (B == 0)
+    ; ---------------------------------------------------------------------
+    LOAD  s6, s3
+    AND   s6, $7F          ; Ignorar signo
+    OR    s6, s2
+    JUMP  NZ, check_div_a
+    LOAD  sF, 01          ; Código de error: División por cero
+    LOAD  s5, $7C          ; Retornar +Infinito
+    LOAD  s4, 00
+    RET
+
+check_div_a:
+    ; ---------------------------------------------------------------------
+    ; 2. Validar Dividendo Cero (A == 0)
+    ; ---------------------------------------------------------------------
+    LOAD  s6, s1
+    AND   s6, $7F
+    OR    s6, s0
+    JUMP  NZ, start_div
+    LOAD  sF, 00          ; Resultado 0.0
+    LOAD  s5, 00
+    LOAD  s4, 00
+    RET
+
+start_div:
+    ; ---------------------------------------------------------------------
+    ; 3. Signo del Resultado: Sign_A XOR Sign_B
+    ; ---------------------------------------------------------------------
+    LOAD  s8, s1
+    XOR   s8, s3
+    AND   s8, $80          ; Aislar bit 7 (Signo resultante)
+
+    ; ---------------------------------------------------------------------
+    ; 4. Cálculo de Exponentes (Exp_R = Exp_A - Exp_B + 15)
+    ; ---------------------------------------------------------------------
+    LOAD  s6, s1          ; Exp_A -> s6
+    AND   s6, $7C
+    SR0   s6
+    SR0   s6
+
+    LOAD  s7, s3          ; Exp_B -> s7
+    AND   s7, $7C
+    SR0   s7
+    SR0   s7
+
+    SUB   s6, s7
+    ADD   s6, $0F          ; Exp_R en s6
+
+    ; ---------------------------------------------------------------------
+    ; 5. Extracción de Mantisas con '1' implícito (11 bits en 16 bits)
+    ; ---------------------------------------------------------------------
+    ; Mantisa A: DIVIDENDO en sC:sB , s1:s0
+    ;;#LOAD  sC, s1
+    AND   s1, $03
+    OR    s1, $04          ; Insertar bit implicito'1' implícito (bit 2 de s1)
+    ;;#LOAD  sB, s0
+
+    ; Mantisa B: DIVISOR en sA:s9 , s3:s2
+    ;;#LOAD  sA, s3
+    AND   s3, $03
+    OR    s3, $04          ; Insertar bit implicito'1' implícito (bit 2 de s3)
+    ;;#LOAD  s9, s2
+
+    ; ---------------------------------------------------------------------
+    ; 6. Bucle de División Restaurativa (12 Iteraciones de Resta y Desplazamiento)
+    ; ---------------------------------------------------------------------
+    LOAD  sE, 00;sC           ;mantisa MSB  del divisor
+    LOAD  sD, 00;sB           ;mantisa LSB  del divisor
+
+    LOAD  sF, $0B;0C        ; Contador = 12 iteraciones
+
+    ;;LOAD  sC, 00
+    ;;LOAD  sB, 00
+
+div_loop:
+    ; Desplazar cociente sE:sD a la izquierda
+    SL0   sD
+    SLA   sE
+
+    ; Comparar Residuo (sC:sB) , (s1:s0)   con Divisor (sA:s9) , (s3:s2)  
+
+    ; Restar Divisor del Residuo
+    SUB   s0, s2
+    SUBC s1, s3
+
+    JUMP C, restore_rema
+
+    OR   sD, 01          ; Poner bit '1' en el cociente
+    
+    JUMP next_bit
+
+restore_rema:
+    ADD s0, s2
+    ADDC s1, s3
+
+
+next_bit:
+
+    ; Desplazar Residuo sC:sB , s1:s0  a la izquierda
+    SL0   s0
+    SLA   s1
+
+    SUB   sF, 01
+    JUMP  NZ, div_loop
+
+    ; ---------------------------------------------------------------------
+    ; 7. Normalización del Cociente
+    ; ---------------------------------------------------------------------
+COCI0:              ; caso Cociente sea Cero.
+    TEST sE, $ff
+    JUMP NZ, norm_loop
+    TEST sD, $ff
+    JUMP NZ, norm_loop
+    LOAD s6, 00
+    JUMP pack_result
+
+norm_loop:
+    TEST  sE, 04          ; Verificar si el bit 10 está en '1'
+    JUMP  NZ, pack_result
+    SL0   sD              ; Desplazar a la izquierda si no está normalizado
+    SLA   sE
+    SUB   s6, 01          ; Decrementar exponente
+    JUMP norm_loop
+
+    ; ---------------------------------------------------------------------
+    ; 8. Empaquetado en s5:s4
+    ; ---------------------------------------------------------------------
+pack_result:
+    LOAD  s4, sD          ; Fracción LSB
+    LOAD  s5, sE
+    AND   s5, 03          ; Descartar bit implícito '1', conservar 2 bits altos
+
+    ; Insertar Exponente (bits 6..2)
+    SL0   s6
+    SL0   s6
+    AND   s6, $7C
+    OR    s5, s6
+
+    ; Insertar Signo (bit 7)
+    OR    s5, s8
+
+    LOAD  sF, 00          ; Estado OK
+    RET
