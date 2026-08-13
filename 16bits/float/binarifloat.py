@@ -79,6 +79,62 @@ def bin32Tofloat(b):
     print("f: ", f)
     return f
 
+
+import math
+
+def floatTobin32(num):
+    # 1. Casos Especiales (Ceros)
+    if num == 0.0:
+        # math.copysign verifica si es -0.0 o +0.0
+        return "0x80000000" if math.copysign(1.0, num) < 0 else "0x00000000"
+
+    # 2. Determinar Signo
+    signo = 1 if num < 0 else 0
+    num = abs(num)
+
+    # 3. Calcular Exponente Real
+    exp_real = math.floor(math.log2(num))
+    
+    # 4. Calcular Exponente Sesgado (Bias = 127 para 32 bits)
+    exp_sesgado = exp_real + 127
+
+    # 5. Lógica de Mantisa y límites
+    if exp_sesgado >= 255:
+        # Desbordamiento -> Infinito
+        exp_sesgado = 255
+        mantisa = 0
+    elif exp_sesgado <= 0:
+        # Número Subnormal (demasiado pequeño, exp_sesgado es 0)
+        exp_sesgado = 0
+        # En subnormales de 32 bits, el exponente implícito es -126
+        fraccion = num / (2 ** -126)
+        mantisa = int(round(fraccion * (2 ** 23)))
+    else:
+        # Número Normalizado
+        fraccion = (num / (2 ** exp_real)) - 1.0
+        mantisa = int(round(fraccion * (2 ** 23)))
+        
+        # Corrección: si el redondeo desborda los 23 bits (2^23)
+        if mantisa == (2 ** 23):
+            mantisa = 0
+            exp_sesgado += 1
+            if exp_sesgado >= 255:
+                exp_sesgado = 255
+                mantisa = 0
+
+    # 6. Ensamblar los bits usando desplazamientos lógicos (Shift OR)
+    # Signo en bit 31, Exponente en bits 23-30, Mantisa en bits 0-22
+    bits_32 = (signo << 31) | (exp_sesgado << 23) | mantisa
+
+    # 7. Formatear como Hexadecimal de 8 dígitos
+    #return f"0x{bits_32:08X}"
+    #
+    return hex(bits_32)
+
+
+
+
+
 # --- Ejemplos de uso ---
 print(f"32.5   -> {floatTobin16(32.5)}")   # Salida: 0x5010
 print(f"4.332  -> {floatTobin16(4.332)}")  # Salida: 0x4455
