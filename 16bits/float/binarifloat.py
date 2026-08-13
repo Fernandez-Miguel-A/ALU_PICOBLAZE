@@ -62,6 +62,23 @@ def floatTobin16(num):
     #
     return hex(bits_16)
 
+
+
+# para 32 bits:
+#    falta descripcion
+#    sin construir
+
+def bin32Tofloat(b):
+    S = (b&0x80000000)>>(31)
+    E = (b&0x7F800000)>>(23)
+    M = (b&0x007fffff)
+    print("b:", hex(b))
+    print(f"S: {S}, E: {E}, M: {M}")
+#
+    f = (-1)**S*2**(E-127)*(1+M/2**23)
+    print("f: ", f)
+    return f
+
 # --- Ejemplos de uso ---
 print(f"32.5   -> {floatTobin16(32.5)}")   # Salida: 0x5010
 print(f"4.332  -> {floatTobin16(4.332)}")  # Salida: 0x4455
