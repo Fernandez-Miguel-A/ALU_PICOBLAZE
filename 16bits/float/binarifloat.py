@@ -10,7 +10,10 @@ def bin16Tofloat(b):
     print("b:", hex(b))
     print(f"S: {S}, E: {E}, M: {M}")
 #
-    f = (-1)**S*2**(E-15)*(1+M/2**10)
+    if E == 0x0:
+        f = (-1)**S*2**(1-15)*(M/2**10)
+    else:
+        f = (-1)**S*2**(E-15)*(1+M/2**10)
     print("f: ", f)
     return f
 
@@ -75,7 +78,10 @@ def bin32Tofloat(b):
     print("b:", hex(b))
     print(f"S: {S}, E: {E}, M: {M}")
 #
-    f = (-1)**S*2**(E-127)*(1+M/2**23)
+    if E == 0x0:
+        f = (-1)**S*2**(1-127)*(M/2**23)
+    else:
+        f = (-1)**S*2**(E-127)*(1+M/2**23)
     print("f: ", f)
     return f
 
