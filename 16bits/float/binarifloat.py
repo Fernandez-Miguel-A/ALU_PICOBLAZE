@@ -50,7 +50,7 @@ def floatTobin16(num):
         mantisa = int(round(fraccion * (2 ** 10)))
 #        
         # Corrección: si el redondeo desborda los 10 bits (ej. 1024)
-        if mantisa == 1024:
+        if mantisa == (2**10):
             mantisa = 0
             exp_sesgado += 1
 #
