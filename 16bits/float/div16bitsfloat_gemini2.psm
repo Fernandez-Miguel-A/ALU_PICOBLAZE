@@ -6,17 +6,19 @@
 ; Registros de entrada:
 ;   s0:s1 = Dividendo (16 bits float16)
 ;   s2:s3 = Divisor   (16 bits float16)
+
 ;   s0/s2 = byte bajo (mantisa[7:0])
 ;   s1/s3 = byte alto (signo + exp[4:0] + mantisa[9:8])
+
 ; Registros de salida:
 ;   s4:s5 = Resultado - "Cociente" (16 bits float16)
 ;   NO existe un "RESIDUO"
-; Registros temporales (6): s6–s8; sD-sF
+; Registros temporales (6): sA-sF
 ; ============================================================
 
 
 ;; total de registros usados: 12.
-;; registros no utilizados s9, sA, sB, sC.
+;; registros no utilizados s6, s7, s8, s9.
 
 
 PRINCIPAL:
@@ -40,9 +42,9 @@ fp16_divide:
     ; -----------------------------------------------------------------
     ; 1. Validar División por Cero (B == 0)
     ; -----------------------------------------------------------------
-    LOAD  s6, s3
-    AND   s6, $7F          ; Ignorar signo
-    OR    s6, s2
+    LOAD  sA, s3
+    AND   sA, $7F          ; Ignorar signo
+    OR    sA, s2
     JUMP  NZ, check_div_a
     LOAD  sF, 01          ; Código de error: División por cero
     LOAD  s5, $7C          ; Retornar +Infinito
@@ -53,9 +55,9 @@ check_div_a:
     ; -----------------------------------------------------------------
     ; 2. Validar Dividendo Cero (A == 0)
     ; -----------------------------------------------------------------
-    LOAD  s6, s1
-    AND   s6, $7F
-    OR    s6, s0
+    LOAD  sA, s1
+    AND   sA, $7F
+    OR    sA, s0
     JUMP  NZ, start_div
     LOAD  sF, 00          ; Resultado 0.0
     LOAD  s5, 00
@@ -66,25 +68,25 @@ start_div:
     ; -----------------------------------------------------------------
     ; 3. Signo del Resultado: Sign_A XOR Sign_B
     ; -----------------------------------------------------------------
-    LOAD  s8, s1
-    XOR   s8, s3
-    AND   s8, $80          ; Aislar bit 7 (Signo resultante)
+    LOAD  sC, s1
+    XOR   sC, s3
+    AND   sC, $80          ; Aislar bit 7 (Signo resultante)
 
     ; -----------------------------------------------------------------
     ; 4. Cálculo de Exponentes (Exp_R = Exp_A - Exp_B + 15)
     ; -----------------------------------------------------------------
-    LOAD  s6, s1          ; Exp_A -> s6
-    AND   s6, $7C
-    SR0   s6
-    SR0   s6
+    LOAD  sA, s1          ; Exp_A -> sA
+    AND   sA, $7C
+    SR0   sA
+    SR0   sA
 
-    LOAD  s7, s3          ; Exp_B -> s7
-    AND   s7, $7C
-    SR0   s7
-    SR0   s7
+    LOAD  sB, s3          ; Exp_B -> sB
+    AND   sB, $7C
+    SR0   sB
+    SR0   sB
 
-    SUB   s6, s7
-    ADD   s6, $0F          ; Exp_R en s6
+    SUB   sA, sB
+    ADD   sA, $0F          ; Exp_R en sA
 
     ; -----------------------------------------------------------------
     ; 5. Extracción de Mantisas con '1' implícito (11 bits en 16 bits)
@@ -147,7 +149,7 @@ COCI0:              ; caso Cociente sea Cero.
     JUMP NZ, norm_loop
     TEST sD, $ff
     JUMP NZ, norm_loop
-    LOAD s6, 00
+    LOAD sA, 00
     JUMP pack_result
 
 norm_loop:
@@ -155,7 +157,7 @@ norm_loop:
     JUMP  NZ, pack_result
     SL0   sD              ; Desplazar a la izquierda si no está normalizado
     SLA   sE
-    SUB   s6, 01          ; Decrementar exponente
+    SUB   sA, 01          ; Decrementar exponente
     JUMP norm_loop
 
     ; -----------------------------------------------------------------
@@ -167,13 +169,13 @@ pack_result:
     AND   s5, 03          ; Descartar bit implícito '1', conservar 2 bits altos
 
     ; Insertar Exponente (bits 6..2)
-    SL0   s6
-    SL0   s6
-    AND   s6, $7C
-    OR    s5, s6
+    SL0   sA
+    SL0   sA
+    AND   sA, $7C
+    OR    s5, sA
 
     ; Insertar Signo (bit 7)
-    OR    s5, s8
+    OR    s5, sC
 
     LOAD  sF, 00          ; Estado OK
     RET
