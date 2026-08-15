@@ -1,7 +1,19 @@
-; =========================================================================
-; SUBRUTINA: DIVISOR DE PUNTO FLOTANTE DE 16 BITS (FP16)
+; ============================================================
+; División en punto flotante 16 bits para PicoBlaze
+; IEEE 754 Half-Precision: 1 signo + 5 exp + 10 mantisa
 ; PicoBlaze-3 (KCPSM3)
-; =========================================================================
+; ============================================================
+; Registros de entrada:
+;   s0:s1 = Dividendo (16 bits float16)
+;   s2:s3 = Divisor   (16 bits float16)
+;   s0/s2 = byte bajo (mantisa[7:0])
+;   s1/s3 = byte alto (signo + exp[4:0] + mantisa[9:8])
+; Registros de salida:
+;   s4:s5 = Resultado - "Cociente" (16 bits float16)
+;   NO existe un "RESIDUO"
+; Registros temporales (6): s6–s8; sD-sF
+; ============================================================
+
 
 ;; total de registros usados: 12.
 ;; registros no utilizados s9, sA, sB, sC.
@@ -25,9 +37,9 @@ STORE s4, $14
 JUMP PRINCIPAL
 
 fp16_divide:
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     ; 1. Validar División por Cero (B == 0)
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     LOAD  s6, s3
     AND   s6, $7F          ; Ignorar signo
     OR    s6, s2
@@ -38,9 +50,9 @@ fp16_divide:
     RET
 
 check_div_a:
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     ; 2. Validar Dividendo Cero (A == 0)
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     LOAD  s6, s1
     AND   s6, $7F
     OR    s6, s0
@@ -51,16 +63,16 @@ check_div_a:
     RET
 
 start_div:
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     ; 3. Signo del Resultado: Sign_A XOR Sign_B
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     LOAD  s8, s1
     XOR   s8, s3
     AND   s8, $80          ; Aislar bit 7 (Signo resultante)
 
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     ; 4. Cálculo de Exponentes (Exp_R = Exp_A - Exp_B + 15)
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     LOAD  s6, s1          ; Exp_A -> s6
     AND   s6, $7C
     SR0   s6
@@ -74,40 +86,35 @@ start_div:
     SUB   s6, s7
     ADD   s6, $0F          ; Exp_R en s6
 
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     ; 5. Extracción de Mantisas con '1' implícito (11 bits en 16 bits)
-    ; ---------------------------------------------------------------------
-    ; Mantisa A: DIVIDENDO en sC:sB , s1:s0
+    ; -----------------------------------------------------------------
+    ; Mantisa A: DIVIDENDO en s0:s1
     ;;#LOAD  sC, s1
     AND   s1, $03
     OR    s1, $04          ; Insertar bit implicito'1' implícito (bit 2 de s1)
     ;;#LOAD  sB, s0
 
-    ; Mantisa B: DIVISOR en sA:s9 , s3:s2
+    ; Mantisa B: DIVISOR en s2:s3
     ;;#LOAD  sA, s3
     AND   s3, $03
     OR    s3, $04          ; Insertar bit implicito'1' implícito (bit 2 de s3)
     ;;#LOAD  s9, s2
 
-    ; ---------------------------------------------------------------------
-    ; 6. Bucle de División Restaurativa (12 Iteraciones de Resta y Desplazamiento)
-    ; ---------------------------------------------------------------------
-    LOAD  sE, 00;sC           ;mantisa MSB  del divisor
-    LOAD  sD, 00;sB           ;mantisa LSB  del divisor
+    ; -----------------------------------------------------------------
+    ; 6. Bucle de División Restaurativa (11 Iteraciones de Resta y Desplazamiento)
+    ; -----------------------------------------------------------------
+    LOAD  sE, 00           ;mantisa MSB  del divisor
+    LOAD  sD, 00           ;mantisa LSB  del divisor
 
-    LOAD  sF, $0B;0C        ; Contador = 12 iteraciones
-
-    ;;LOAD  sC, 00
-    ;;LOAD  sB, 00
+    LOAD  sF, $0B          ; Contador = 11 iteraciones
 
 div_loop:
-    ; Desplazar cociente sE:sD a la izquierda
+    ; Desplazar Cociente (sD:sE) a la izquierda
     SL0   sD
-    SLA   sE
+    SLA   sE 
 
-    ; Comparar Residuo (sC:sB) , (s1:s0)   con Divisor (sA:s9) , (s3:s2)  
-
-    ; Restar Divisor del Residuo
+    ; Restar al Dividendo el Divisor.
     SUB   s0, s2
     SUBC s1, s3
 
@@ -118,22 +125,23 @@ div_loop:
     JUMP next_bit
 
 restore_rema:
+    ; No restar (restaurar) — poner bit sD en 0
     ADD s0, s2
     ADDC s1, s3
 
 
 next_bit:
 
-    ; Desplazar Residuo sC:sB , s1:s0  a la izquierda
+    ; Desplazar s0:s1 -Dividendo-COCIENTE-  a la izquierda
     SL0   s0
     SLA   s1
 
     SUB   sF, 01
     JUMP  NZ, div_loop
 
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     ; 7. Normalización del Cociente
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
 COCI0:              ; caso Cociente sea Cero.
     TEST sE, $ff
     JUMP NZ, norm_loop
@@ -150,9 +158,9 @@ norm_loop:
     SUB   s6, 01          ; Decrementar exponente
     JUMP norm_loop
 
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
     ; 8. Empaquetado en s5:s4
-    ; ---------------------------------------------------------------------
+    ; -----------------------------------------------------------------
 pack_result:
     LOAD  s4, sD          ; Fracción LSB
     LOAD  s5, sE
