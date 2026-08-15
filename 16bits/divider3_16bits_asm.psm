@@ -20,8 +20,6 @@ quotient_16b    EQU      sA             ; $00
 remainder       EQU      s3 ; modified ; $73
 remainder_16b   EQU      sB   		   ; $01
 i               EQU      s4 ;
-temp_low        EQU      s5;<.......................
-temp_high       EQU      sD;<.......................
 ;
 div    EQU     $10 ;$0b    ;;0x0001
 div_16b EQU    $01 ;$02    ;;0x0100
