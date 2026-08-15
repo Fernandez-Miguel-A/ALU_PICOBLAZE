@@ -126,7 +126,6 @@ def floatTobin32(num):
             exp_sesgado += 1
             if exp_sesgado >= 255:
                 exp_sesgado = 255
-                mantisa = 0
 
     # 6. Ensamblar los bits usando desplazamientos lógicos (Shift OR)
     # Signo en bit 31, Exponente en bits 23-30, Mantisa en bits 0-22
