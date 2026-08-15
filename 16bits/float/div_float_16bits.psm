@@ -12,7 +12,7 @@
 ; Registros temporales: s4–sF
 ; ============================================================
 
-;; total de registros usados: 15.
+;; total de registros usados: 16.
 ;; utiliza el total de los registros disponibles en picoblaze.
 
 
