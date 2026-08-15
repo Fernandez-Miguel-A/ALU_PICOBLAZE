@@ -1,7 +1,7 @@
 ; ========================================================
 ; SUBRUTINA: SUMA_FP16
-; Entrada:  Operando A en (s1:s0), Operando B en (s3:s2)
-; Salida:   Resultado en (s1:s0)
+; Entrada:  Operando A en (s0:s1), Operando B en (s2:s3)
+; Salida:   Resultado en (s0:s1)
 ; ========================================================
 
 ;; total de registros usados: 11.
@@ -60,7 +60,7 @@ suma_fp16:
     JUMP  C, swap_y_alinear ; Si ExpA < ExpB, intercambiar
 
 alinear_b:
-    ; Desplazar Mantisa B (s7:s6) a la derecha sA veces
+    ; Desplazar Mantisa B (s6:s7) a la derecha sA veces
     SR0   s7
     SRA   s6
     SUB   sA, 01

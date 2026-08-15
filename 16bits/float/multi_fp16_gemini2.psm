@@ -1,7 +1,7 @@
 ; ===================================================================
 ; Subrutina: FMUL_16 (Multiplicación Float de 16 bits)
-; Entradas: s1:s0 = Operando A, s3:s2 = Operando B
-; Salidas:  s5:s4 = Resultado (A * B)
+; Entradas: s0:s1 = Operando A, s2:s3 = Operando B
+; Salidas:  s4:s5 = Resultado (A * B)
 ; ===================================================================
 
 ;; total de registros usados: 13.
@@ -70,9 +70,9 @@ FMUL_16:
 
     ; ---------------------------------------------------------------
     ; 5. MULTIPLICAR MANTISAS (11-bit x 11-bit = 22-bit)
-    ; Multiplicador: s3:s2
-    ; Multiplicando: sC:s1:s0 (Aumentamos a 3 bytes para los desplazamientos)
-    ; Producto: s9:s8:s7
+    ; Multiplicador: s2:s3
+    ; Multiplicando: s0:s1:sC (Aumentamos a 3 bytes para los desplazamientos)
+    ; Producto: s7:s8:s9
     ; ---------------------------------------------------------------
     LOAD sC, 00       ; Inicializar multiplicando alto
     LOAD s9, 00       ; Inicializar producto alto
