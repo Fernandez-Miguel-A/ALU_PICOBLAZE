@@ -33,6 +33,9 @@ N_16b  EQU     $32 ;$fc  ;;0x3100          ;0xCE00
 ;$fcbc - $020b*$007b == $0173
 
 
+;; total de registros usados: 9.
+;; registros no utilizados s5, s6, s7,  sC, sD, sE, sF.
+
 
 ;def divider3(N, div):
 ;    r, coci = 0,0
