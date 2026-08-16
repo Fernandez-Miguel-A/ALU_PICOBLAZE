@@ -56,8 +56,6 @@ def floatTobin16(num):
         if mantisa == (2**10):
             mantisa = 0
             exp_sesgado += 1
-            if exp_sesgado >= 31:
-                exp_sesgado = 31
 #
     # 6. Ensamblar los bits usando desplazamientos lógicos (Shift OR)
     bits_16 = (signo << 15) | (exp_sesgado << 10) | mantisa
@@ -126,8 +124,6 @@ def floatTobin32(num):
         if mantisa == (2 ** 23):
             mantisa = 0
             exp_sesgado += 1
-            if exp_sesgado >= 255:
-                exp_sesgado = 255
 
     # 6. Ensamblar los bits usando desplazamientos lógicos (Shift OR)
     # Signo en bit 31, Exponente en bits 23-30, Mantisa en bits 0-22
